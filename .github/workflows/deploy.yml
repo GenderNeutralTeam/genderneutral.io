@@ -1,0 +1,59 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+
+jobs:
+  migrate:
+    if: ${{ github.ref == 'refs/heads/staging' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cp .env.ci .env
+          sed -i -E "s|DATABASE_URL=.+|DATABASE_URL=$DATABASE_URL|" .env
+          npm install
+      - name: Migrate PlanetScale database
+        run: |
+          npx prisma db push
+
+  create-request:
+    if: ${{ github.ref == 'refs/heads/staging' }}
+    needs: migrate
+    runs-on: ubuntu-latest
+    container:
+      image: planetscale/pscale:latest
+      options: --entrypoint sh
+    steps:
+      - name: Create PlanetScale deploy request
+        env:
+          SERVICE_TOKEN: ${{ secrets.PLANETSCALE_SERVICE_TOKEN }}
+          SERVICE_TOKEN_ID: ${{ secrets.PLANETSCALE_SERVICE_TOKEN_ID }}
+        run: pscale deploy-request create genderneutral staging --org genderneutral --service-token "$SERVICE_TOKEN" --service-token-id "$SERVICE_TOKEN_ID"
+
+  deploy-request:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    container:
+      image: planetscale/pscale:latest
+      options: --entrypoint sh
+    steps:
+      - name: Deploy PlanetScale deploy request
+        env:
+          SERVICE_TOKEN: ${{ secrets.PLANETSCALE_SERVICE_TOKEN }}
+          SERVICE_TOKEN_ID: ${{ secrets.PLANETSCALE_SERVICE_TOKEN_ID }}
+        run: |
+          pscale deploy-request list genderneutral --format json --org genderneutral --service-token "$SERVICE_TOKEN" --service-token-id "$SERVICE_TOKEN_ID" > /tmp/requests.json
+          NUMBER=$(cat /tmp/requests.json | jq "[. [] | select(.state == \"open\" and .branch == \"staging\") ] | .[0].number" )
+          pscale deploy-request deploy genderneutral $NUMBER --org genderneutral --service-token "$SERVICE_TOKEN" --service-token-id "$SERVICE_TOKEN_ID"
