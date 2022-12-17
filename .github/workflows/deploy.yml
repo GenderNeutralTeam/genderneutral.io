@@ -54,6 +54,7 @@ jobs:
           SERVICE_TOKEN: ${{ secrets.PLANETSCALE_SERVICE_TOKEN }}
           SERVICE_TOKEN_ID: ${{ secrets.PLANETSCALE_SERVICE_TOKEN_ID }}
         run: |
+          apk add jq
           pscale deploy-request list genderneutral --format json --org genderneutral --service-token "$SERVICE_TOKEN" --service-token-id "$SERVICE_TOKEN_ID" > /tmp/requests.json
           NUMBER=$(cat /tmp/requests.json | jq "[. [] | select(.state == \"open\" and .branch == \"staging\") ] | .[0].number" )
           pscale deploy-request deploy genderneutral $NUMBER --org genderneutral --service-token "$SERVICE_TOKEN" --service-token-id "$SERVICE_TOKEN_ID"
