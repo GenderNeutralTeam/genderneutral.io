@@ -8,11 +8,104 @@ datasource db {
   relationMode  = "prisma"
 }
 
-// model Example {
-//   id        String   @id @default(cuid())
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
+// Surveys
+
+model Survey {
+  id              String          @id @default(cuid())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  name            String          @db.VarChar(255)
+  slug            String          @db.VarChar(255)
+  description     String?         @db.Text
+
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  participations  Participation[]
+
+  @@unique([slug])
+  @@index([userId])
+}
+
+enum QuestionType {
+  BOOLEAN
+  INTEGER
+  DECIMAL
+  STRING
+}
+
+model Question {
+  id            String            @id @default(cuid())
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  name          String            @db.VarChar(255)
+  type          QuestionType
+  minCount      Int?
+  maxCount      Int?
+  minLength     Int?
+  maxLength     Int?
+  minValue      Int?
+  maxValue      Int?
+  stepValue     Int?
+  decimalPlaces Int?
+  allowCustom   Boolean           @default(false)
+
+  surveyId      String
+  survey        Survey            @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  choices       QuestionChoice[]
+  answers       Answer[]
+
+  @@index([surveyId])
+}
+
+model QuestionChoice {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  value       String?   @db.Text
+  label       String?   @db.Text
+
+  questionId  String
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model Participation {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  ipHash      String    @db.Char(128)
+
+  surveyId    String
+  survey      Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  answers     Answer[]
+
+  @@index([surveyId])
+  @@index([userId])
+}
+
+model Answer {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  valueIndex      Int
+  value           String        @db.Text
+
+  participationId String
+  participation   Participation @relation(fields: [participationId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([participationId])
+  @@index([questionId])
+}
 
 // NextAuth.js
 
@@ -20,48 +113,66 @@ datasource db {
 // Since these fields are only used by NextAuth.js internals, the Prisma field names have been left unchanged.
 
 model Account {
-  id                String  @id @default(cuid())
-  userId            String
+  id                String    @id @default(cuid())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text @map("refreshToken")
-  access_token      String? @db.Text @map("accessToken")
-  expires_at        Int?    @map("expiresAt")
-  token_type        String? @map("tokenType")
+  refresh_token     String?   @db.Text @map("refreshToken")
+  access_token      String?   @db.Text @map("accessToken")
+  expires_at        Int?      @map("expiresAt")
+  token_type        String?   @map("tokenType")
   scope             String?
-  id_token          String? @db.Text @map("idToken")
-  session_state     String? @map("sessionState")
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id_token          String?   @db.Text @map("idToken")
+  session_state     String?   @map("sessionState")
+
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessionToken  String    @unique
+  expires       DateTime
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
+  id              String          @id @default(cuid())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  name            String?
+  email           String?         @unique
+  emailVerified   DateTime?
+  image           String?
+
+  accounts        Account[]
+  sessions        Session[]
+  surveys         Survey[]
+  participations  Participation[]
 }
 
 model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  identifier  String
+  token       String    @unique
+  expires     DateTime
 
   @@unique([identifier, token])
 }
