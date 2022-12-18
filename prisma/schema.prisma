@@ -18,6 +18,7 @@ model Survey {
   name            String          @db.VarChar(255)
   slug            String          @db.VarChar(255)
   description     String?         @db.Text
+  isTemplate      Boolean         @default(false)
 
   userId          String
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
